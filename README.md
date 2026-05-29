@@ -35,14 +35,26 @@ npm run preview
    - **Target:** `sule57.github.io`
 6. Wait for DNS and HTTPS (often 15–60 minutes).
 
-## Cross-origin headers (Word conversion)
+## Word conversion modes
+
+**Default (no extra headers):** `.docx` files convert with a built-in browser converter (mammoth + jsPDF). Works on GitHub Pages immediately. Layout may differ from Word; legacy `.doc` is not supported on this path.
+
+**Full quality (optional):** LibreOffice WASM runs when `crossOriginIsolated` is `true`, which needs COOP/COEP headers (see below). Supports `.doc` and `.docx` with better fidelity.
+
+Check which mode you are in (browser console on the convert page):
+
+```js
+crossOriginIsolated  // false = standard .docx mode, true = LibreOffice WASM
+```
+
+## Cross-origin headers (full-quality WASM)
 
 LibreOffice WASM needs `SharedArrayBuffer`, which requires:
 
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp`
 
-GitHub Pages cannot set these headers. **Combine PDFs** works without them; **Word to PDF** needs Cloudflare (or similar) in front of the subdomain.
+GitHub Pages cannot set these headers. **Combine PDFs** works without them.
 
 ### Important: do not use Google Fonts with `require-corp`
 
@@ -63,14 +75,25 @@ Cross-origin font CDNs (e.g. Google Fonts) prevent the page from becoming cross-
 
 5. Deploy the rule and purge cache if you changed headers on a live site.
 
-Verify in the browser console on the convert page: `crossOriginIsolated` should be `true`.
+Verify headers are actually applied (must show both lines):
+
+```bash
+curl -sI https://pdf.susic-security.com/ | grep -i cross-origin
+```
+
+If nothing is returned, the Transform Rule is missing, on the wrong rule type (**Response**, not Request), or the hostname does not match.
+
+### Optional: Cloudflare Worker
+
+If Transform Rules do not apply, deploy [`cloudflare/worker.js`](cloudflare/worker.js) with [Wrangler](https://developers.cloudflare.com/workers/wrangler/) and route `pdf.susic-security.com/*` to the worker (see [`wrangler.toml`](wrangler.toml)).
 
 ## Tech stack
 
 - [Vite](https://vitejs.dev/) + TypeScript
 - [@fontsource/inter](https://fontsource.org/fonts/inter) — self-hosted fonts
 - [pdf-lib](https://pdf-lib.js.org/) — merge PDFs
-- [@matbee/libreoffice-converter](https://github.com/matbeedotcom/libreoffice-document-converter) — Word → PDF in the browser
+- [@matbee/libreoffice-converter](https://github.com/matbeedotcom/libreoffice-document-converter) — full-quality Word → PDF (when isolated)
+- [mammoth](https://www.npmjs.com/package/mammoth) + [jsPDF](https://github.com/parallax/jsPDF) — standard `.docx` conversion fallback
 - [JSZip](https://stuk.github.io/jszip/) — batch download
 
 ## License

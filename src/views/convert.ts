@@ -3,6 +3,7 @@ import {
   conversionStartErrorMessage,
   validateWordFile,
   isWordFile,
+  isCrossOriginIsolated,
 } from '../lib/converter'
 import {
   downloadBlob,
@@ -77,7 +78,7 @@ export function renderConvert(container: HTMLElement): void {
       <span class="site-logo">Word <span>to PDF</span></span>
     </header>
     <h1 class="page-title">Word to PDF</h1>
-    <p class="page-subtitle">Upload .doc or .docx files. Conversion runs locally with LibreOffice WASM.</p>
+    <p class="page-subtitle" id="convert-subtitle">Upload .doc or .docx files. Conversion runs in your browser; files are not uploaded.</p>
     <div class="alert alert-warning" id="mobile-hint" hidden>
       Large documents may be slow on mobile devices. A desktop browser is recommended for conversion.
     </div>
@@ -101,9 +102,22 @@ export function renderConvert(container: HTMLElement): void {
     <div id="convert-error" class="alert alert-error" hidden></div>
   `
 
+  const subtitle = container.querySelector('#convert-subtitle') as HTMLElement
+  if (!isCrossOriginIsolated()) {
+    subtitle.textContent =
+      'Upload .docx files for conversion in your browser (.docx recommended on this setup). Complex layouts may differ slightly from Word.'
+  }
+
   if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
     const hint = container.querySelector('#mobile-hint') as HTMLElement
     hint.hidden = false
+  }
+
+  if (import.meta.env.DEV && !isCrossOriginIsolated()) {
+    console.info(
+      '[PDF Tools] crossOriginIsolated is false — using standard DOCX conversion. ' +
+        'For LibreOffice WASM, serve with COOP/COEP headers (see README).',
+    )
   }
 
   const drop = container.querySelector('#convert-drop') as HTMLElement

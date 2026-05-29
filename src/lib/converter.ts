@@ -16,9 +16,8 @@ export function isCrossOriginIsolated(): boolean {
   return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
 }
 
-/** User-facing message when conversion cannot start. */
 export function conversionStartErrorMessage(): string {
-  return 'Conversion could not start. Try a hard refresh or another browser.'
+  return 'Conversion failed. Try again or use a .docx file.'
 }
 
 export function isWordFile(file: File): boolean {
@@ -80,18 +79,9 @@ function resetInitState(): void {
   converter = null
 }
 
-export async function initializeConverter(
+async function initializeWasmConverter(
   onProgress?: (info: WasmLoadProgress) => void,
 ): Promise<WorkerBrowserConverter> {
-  if (!isCrossOriginIsolated()) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        'crossOriginIsolated is false; Word conversion may not work until COOP/COEP headers are set.',
-      )
-    }
-    throw new Error(conversionStartErrorMessage())
-  }
-
   if (converter?.isReady()) {
     return converter
   }
@@ -123,6 +113,34 @@ export async function initializeConverter(
   }
 }
 
+async function convertWordToPdfWasm(
+  file: File,
+  onProgress?: (info: WasmLoadProgress) => void,
+): Promise<ConversionResult> {
+  const conv = await initializeWasmConverter(onProgress)
+  const buffer = await file.arrayBuffer()
+  return conv.convert(buffer, { outputFormat: 'pdf' }, file.name)
+}
+
+/** Whether the site is using the lighter DOCX converter (no WASM / isolation). */
+export async function checkIsolationHeaders(): Promise<{
+  isolated: boolean
+  coop: string | null
+  coep: string | null
+}> {
+  const isolated = isCrossOriginIsolated()
+  let coop: string | null = null
+  let coep: string | null = null
+  try {
+    const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' })
+    coop = res.headers.get('cross-origin-opener-policy')
+    coep = res.headers.get('cross-origin-embedder-policy')
+  } catch {
+    /* ignore */
+  }
+  return { isolated, coop, coep }
+}
+
 export async function convertWordToPdf(
   file: File,
   onProgress?: (info: WasmLoadProgress) => void,
@@ -132,9 +150,12 @@ export async function convertWordToPdf(
     throw new Error(validation)
   }
 
-  const conv = await initializeConverter(onProgress)
-  const buffer = await file.arrayBuffer()
-  return conv.convert(buffer, { outputFormat: 'pdf' }, file.name)
+  if (isCrossOriginIsolated()) {
+    return convertWordToPdfWasm(file, onProgress)
+  }
+
+  const { convertDocxFallback } = await import('./convert-fallback')
+  return convertDocxFallback(file)
 }
 
 export async function destroyConverter(): Promise<void> {

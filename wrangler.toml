@@ -1,0 +1,7 @@
+name = "pdf-tools-headers"
+main = "cloudflare/worker.js"
+compatibility_date = "2024-01-01"
+
+# After deploy, attach route pdf.susic-security.com/* in Cloudflare dashboard
+# or uncomment and set your zone_id:
+# routes = [{ pattern = "pdf.susic-security.com/*", zone_name = "susic-security.com" }]

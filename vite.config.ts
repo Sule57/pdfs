@@ -19,6 +19,7 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('pdf-lib')) return 'pdf-lib'
           if (id.includes('jszip')) return 'jszip'
+          if (id.includes('mammoth') || id.includes('jspdf')) return 'convert-fallback'
           if (id.includes('libreoffice-converter')) return 'converter-wasm'
         },
       },
