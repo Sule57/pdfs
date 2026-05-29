@@ -1,7 +1,6 @@
 import {
   convertWordToPdf,
-  isCrossOriginIsolated,
-  crossOriginIsolationMessage,
+  conversionStartErrorMessage,
   validateWordFile,
   isWordFile,
 } from '../lib/converter'
@@ -13,7 +12,7 @@ import {
 } from '../lib/download'
 import type { WasmLoadProgress } from '@matbee/libreoffice-converter/browser'
 
-type ItemStatus = 'waiting' | 'converting' | 'done' | 'error'
+type ItemStatus = 'waiting' | 'preparing' | 'converting' | 'done' | 'error'
 
 interface ConvertItem {
   id: string
@@ -30,12 +29,47 @@ function uid(): string {
   return crypto.randomUUID()
 }
 
+function statusLabel(status: ItemStatus): string {
+  switch (status) {
+    case 'done':
+      return 'Ready'
+    case 'error':
+      return 'Failed'
+    case 'converting':
+      return 'Converting…'
+    case 'preparing':
+      return 'Preparing…'
+    default:
+      return 'Waiting'
+  }
+}
+
+function statusClass(status: ItemStatus): string {
+  switch (status) {
+    case 'done':
+      return 'status-done'
+    case 'error':
+      return 'status-error'
+    case 'converting':
+    case 'preparing':
+      return 'status-converting'
+    default:
+      return 'status-waiting'
+  }
+}
+
+function friendlyError(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.message.includes('cross-origin') || err.message.includes('SharedArrayBuffer')) {
+      return conversionStartErrorMessage()
+    }
+    return err.message
+  }
+  return 'Conversion failed'
+}
+
 export function renderConvert(container: HTMLElement): void {
   items = []
-
-  const isolationWarning = !isCrossOriginIsolated()
-    ? `<div class="alert alert-warning">${escapeHtml(crossOriginIsolationMessage())}</div>`
-    : ''
 
   container.innerHTML = `
     <header class="site-header">
@@ -44,7 +78,6 @@ export function renderConvert(container: HTMLElement): void {
     </header>
     <h1 class="page-title">Word to PDF</h1>
     <p class="page-subtitle">Upload .doc or .docx files. Conversion runs locally with LibreOffice WASM.</p>
-    ${isolationWarning}
     <div class="alert alert-warning" id="mobile-hint" hidden>
       Large documents may be slow on mobile devices. A desktop browser is recommended for conversion.
     </div>
@@ -94,11 +127,13 @@ export function renderConvert(container: HTMLElement): void {
     const hasItems = items.length > 0
     const hasWaiting = items.some((i) => i.status === 'waiting')
     const hasDone = items.some((i) => i.status === 'done' && i.pdfData)
-    const busy = items.some((i) => i.status === 'converting')
+    const busy = items.some(
+      (i) => i.status === 'converting' || i.status === 'preparing',
+    )
 
     empty.hidden = hasItems
     list.hidden = !hasItems
-    startBtn.disabled = !hasWaiting || busy || !isCrossOriginIsolated()
+    startBtn.disabled = !hasWaiting || busy
     zipBtn.disabled = !hasDone
     clearBtn.disabled = !hasItems || busy
   }
@@ -119,29 +154,13 @@ export function renderConvert(container: HTMLElement): void {
     for (const item of items) {
       const li = document.createElement('li')
       li.className = 'file-item'
-      const statusClass =
-        item.status === 'done'
-          ? 'status-done'
-          : item.status === 'error'
-            ? 'status-error'
-            : item.status === 'converting'
-              ? 'status-converting'
-              : 'status-waiting'
-      const statusLabel =
-        item.status === 'done'
-          ? 'Ready'
-          : item.status === 'error'
-            ? 'Failed'
-            : item.status === 'converting'
-              ? 'Converting…'
-              : 'Waiting'
 
       li.innerHTML = `
         <div class="file-info">
           <div class="file-name">${escapeHtml(item.file.name)}</div>
           <div class="file-meta">${formatBytes(item.file.size)}${item.error ? ` · ${escapeHtml(item.error)}` : ''}</div>
         </div>
-        <span class="file-status ${statusClass}">${statusLabel}</span>
+        <span class="file-status ${statusClass(item.status)}">${statusLabel(item.status)}</span>
         <div class="file-actions">
           ${
             item.status === 'done' && item.pdfData
@@ -214,36 +233,35 @@ export function renderConvert(container: HTMLElement): void {
         done.map((i) => ({ name: i.pdfName!, data: i.pdfData! })),
       )
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to create ZIP.')
+      showError(friendlyError(err))
     } finally {
       updateButtons()
     }
   })
 
   startBtn.addEventListener('click', async () => {
-    if (!isCrossOriginIsolated()) {
-      showError(crossOriginIsolationMessage())
-      return
-    }
-
     showError('')
     startBtn.disabled = true
     startBtn.textContent = 'Converting…'
 
     for (const item of items) {
       if (item.status !== 'waiting') continue
-      item.status = 'converting'
+
+      item.status = 'preparing'
       item.error = undefined
       renderList()
 
       try {
+        item.status = 'converting'
+        renderList()
+
         const result = await convertWordToPdf(item.file, onEngineProgress)
         item.pdfData = result.data
         item.pdfName = pdfFilenameFromWord(item.file.name)
         item.status = 'done'
       } catch (err) {
         item.status = 'error'
-        item.error = err instanceof Error ? err.message : 'Conversion failed'
+        item.error = friendlyError(err)
       }
       renderList()
     }

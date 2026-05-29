@@ -7,6 +7,7 @@ import type { ConversionResult } from '@matbee/libreoffice-converter/browser'
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024
 const WORD_EXTENSIONS = ['.doc', '.docx']
+const INIT_TIMEOUT_MS = 15 * 60 * 1000
 
 let converter: WorkerBrowserConverter | null = null
 let initPromise: Promise<WorkerBrowserConverter> | null = null
@@ -15,13 +16,9 @@ export function isCrossOriginIsolated(): boolean {
   return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
 }
 
-export function crossOriginIsolationMessage(): string {
-  return (
-    'Word conversion requires cross-origin isolation (COOP/COEP headers). ' +
-    'If you use Cloudflare in front of GitHub Pages, add response headers: ' +
-    'Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp. ' +
-    'See the project README for setup steps.'
-  )
+/** User-facing message when conversion cannot start. */
+export function conversionStartErrorMessage(): string {
+  return 'Conversion could not start. Try a hard refresh or another browser.'
 }
 
 export function isWordFile(file: File): boolean {
@@ -59,11 +56,40 @@ function workerUrl(): string {
   return `${base}dist/browser.worker.global.js`
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    promise
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
+function resetInitState(): void {
+  initPromise = null
+  converter = null
+}
+
 export async function initializeConverter(
   onProgress?: (info: WasmLoadProgress) => void,
 ): Promise<WorkerBrowserConverter> {
   if (!isCrossOriginIsolated()) {
-    throw new Error(crossOriginIsolationMessage())
+    if (import.meta.env.DEV) {
+      console.warn(
+        'crossOriginIsolated is false; Word conversion may not work until COOP/COEP headers are set.',
+      )
+    }
+    throw new Error(conversionStartErrorMessage())
   }
 
   if (converter?.isReady()) {
@@ -80,7 +106,11 @@ export async function initializeConverter(
       browserWorkerJs: workerUrl(),
       onProgress: (info) => onProgress?.(info),
     })
-    await instance.initialize()
+    await withTimeout(
+      instance.initialize(),
+      INIT_TIMEOUT_MS,
+      'Conversion engine timed out. Check your connection and try again.',
+    )
     converter = instance
     return instance
   })()
@@ -88,8 +118,7 @@ export async function initializeConverter(
   try {
     return await initPromise
   } catch (error) {
-    initPromise = null
-    converter = null
+    resetInitState()
     throw error
   }
 }

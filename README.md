@@ -42,22 +42,33 @@ LibreOffice WASM needs `SharedArrayBuffer`, which requires:
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp`
 
-GitHub Pages does not let you set custom response headers. **Combine PDFs** works without them; **Word to PDF** needs one of:
+GitHub Pages cannot set these headers. **Combine PDFs** works without them; **Word to PDF** needs Cloudflare (or similar) in front of the subdomain.
 
-1. **Cloudflare (free)** — Proxy `pdf.susic-security.com` through Cloudflare and add a **Transform Rule** (or **Configuration Rule**) to set both headers on responses for that hostname.
-2. **Local / preview** — `npm run dev` and `npm run preview` already send these headers via Vite.
+### Important: do not use Google Fonts with `require-corp`
 
-### Cloudflare example (free plan)
+Cross-origin font CDNs (e.g. Google Fonts) prevent the page from becoming cross-origin isolated. This project **self-hosts Inter** via `@fontsource/inter` instead.
 
-1. Add the site to Cloudflare and point `pdf` CNAME to `sule57.github.io` (proxied / orange cloud).
-2. **Rules → Transform Rules → Modify Response Header**:
-   - Add `Cross-Origin-Opener-Policy` = `same-origin`
-   - Add `Cross-Origin-Embedder-Policy` = `require-corp`
-3. Scope the rule to hostname `pdf.susic-security.com`.
+### Cloudflare Response Header Transform Rule
+
+1. Proxy `pdf` CNAME through Cloudflare (orange cloud).
+2. **Rules → Transform Rules → Response Header Transform Rules → Create rule**
+3. **Expression:** `(http.host eq "pdf.susic-security.com")`
+4. **Set static** headers on the same rule:
+
+| Header name | Value |
+|-------------|--------|
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+| `Cross-Origin-Embedder-Policy` | `require-corp` |
+| `Cross-Origin-Resource-Policy` | `cross-origin` |
+
+5. Deploy the rule and purge cache if you changed headers on a live site.
+
+Verify in the browser console on the convert page: `crossOriginIsolated` should be `true`.
 
 ## Tech stack
 
 - [Vite](https://vitejs.dev/) + TypeScript
+- [@fontsource/inter](https://fontsource.org/fonts/inter) — self-hosted fonts
 - [pdf-lib](https://pdf-lib.js.org/) — merge PDFs
 - [@matbee/libreoffice-converter](https://github.com/matbeedotcom/libreoffice-document-converter) — Word → PDF in the browser
 - [JSZip](https://stuk.github.io/jszip/) — batch download
