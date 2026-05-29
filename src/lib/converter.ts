@@ -1,0 +1,117 @@
+import {
+  WorkerBrowserConverter,
+  createWasmPaths,
+  type WasmLoadProgress,
+} from '@matbee/libreoffice-converter/browser'
+import type { ConversionResult } from '@matbee/libreoffice-converter/browser'
+
+const MAX_FILE_BYTES = 25 * 1024 * 1024
+const WORD_EXTENSIONS = ['.doc', '.docx']
+
+let converter: WorkerBrowserConverter | null = null
+let initPromise: Promise<WorkerBrowserConverter> | null = null
+
+export function isCrossOriginIsolated(): boolean {
+  return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
+}
+
+export function crossOriginIsolationMessage(): string {
+  return (
+    'Word conversion requires cross-origin isolation (COOP/COEP headers). ' +
+    'If you use Cloudflare in front of GitHub Pages, add response headers: ' +
+    'Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp. ' +
+    'See the project README for setup steps.'
+  )
+}
+
+export function isWordFile(file: File): boolean {
+  const lower = file.name.toLowerCase()
+  return WORD_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+export function validateWordFile(file: File): string | null {
+  if (!isWordFile(file)) {
+    return 'Only .doc and .docx files are supported.'
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return `File exceeds ${MAX_FILE_BYTES / (1024 * 1024)}MB limit.`
+  }
+  return null
+}
+
+export function validatePdfFile(file: File): string | null {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    return 'Only PDF files are supported.'
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    return 'File exceeds 50MB limit.'
+  }
+  return null
+}
+
+function wasmBase(): string {
+  const base = import.meta.env.BASE_URL
+  return `${base}wasm/`
+}
+
+function workerUrl(): string {
+  const base = import.meta.env.BASE_URL
+  return `${base}dist/browser.worker.global.js`
+}
+
+export async function initializeConverter(
+  onProgress?: (info: WasmLoadProgress) => void,
+): Promise<WorkerBrowserConverter> {
+  if (!isCrossOriginIsolated()) {
+    throw new Error(crossOriginIsolationMessage())
+  }
+
+  if (converter?.isReady()) {
+    return converter
+  }
+
+  if (initPromise) {
+    return initPromise
+  }
+
+  initPromise = (async () => {
+    const instance = new WorkerBrowserConverter({
+      ...createWasmPaths(wasmBase()),
+      browserWorkerJs: workerUrl(),
+      onProgress: (info) => onProgress?.(info),
+    })
+    await instance.initialize()
+    converter = instance
+    return instance
+  })()
+
+  try {
+    return await initPromise
+  } catch (error) {
+    initPromise = null
+    converter = null
+    throw error
+  }
+}
+
+export async function convertWordToPdf(
+  file: File,
+  onProgress?: (info: WasmLoadProgress) => void,
+): Promise<ConversionResult> {
+  const validation = validateWordFile(file)
+  if (validation) {
+    throw new Error(validation)
+  }
+
+  const conv = await initializeConverter(onProgress)
+  const buffer = await file.arrayBuffer()
+  return conv.convert(buffer, { outputFormat: 'pdf' }, file.name)
+}
+
+export async function destroyConverter(): Promise<void> {
+  if (converter) {
+    await converter.destroy()
+    converter = null
+  }
+  initPromise = null
+}

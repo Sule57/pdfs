@@ -1,0 +1,21 @@
+{
+  "name": "pdfs",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/copy-assets.mjs",
+    "dev": "vite",
+    "build": "node scripts/copy-assets.mjs && tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12"
+  },
+  "dependencies": {
+    "@matbee/libreoffice-converter": "^2.6.0",
+    "jszip": "^3.10.1",
+    "pdf-lib": "^1.17.1"
+  }
+}
