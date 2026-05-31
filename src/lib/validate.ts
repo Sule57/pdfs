@@ -9,14 +9,3 @@ export function validatePdfFile(file: File): string | null {
   }
   return null
 }
-
-export function validateImageFile(file: File): string | null {
-  const t = file.type.toLowerCase()
-  if (t !== 'image/png' && t !== 'image/jpeg' && t !== 'image/jpg') {
-    return 'Only PNG and JPEG images are supported.'
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    return 'Image exceeds 10MB limit.'
-  }
-  return null
-}

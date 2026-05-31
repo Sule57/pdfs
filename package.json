@@ -1,7 +1,7 @@
 {
   "name": "pdfs",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
-    "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^5.4.296"
+    "pdf-lib": "^1.17.1"
   }
 }

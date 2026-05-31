@@ -1,27 +1,14 @@
 import '../styles/main.css'
-import { renderHome } from './views/home'
 import { renderMerge } from './views/merge'
-import { renderEdit } from './views/edit'
 
 const FOOTER =
   'Files are processed in your browser; nothing is uploaded to a server.'
-
-function getRoute(): string {
-  const hash = window.location.hash.slice(1).replace(/^\//, '')
-  return hash || 'home'
-}
 
 function render(): void {
   const app = document.querySelector<HTMLElement>('#app')
   if (!app) return
 
-  const route = getRoute()
-  document.title =
-    route === 'edit'
-      ? 'Edit PDF — PDF Tools'
-      : route === 'merge'
-        ? 'Combine PDFs — PDF Tools'
-        : 'PDF Tools — susic-security.com'
+  document.title = 'Combine PDFs — PDF Tools'
 
   let main = app.querySelector<HTMLElement>('.container')
   if (!main) {
@@ -36,17 +23,7 @@ function render(): void {
     app.appendChild(footer)
   }
 
-  switch (route) {
-    case 'edit':
-      renderEdit(main)
-      break
-    case 'merge':
-      renderMerge(main)
-      break
-    default:
-      renderHome(main)
-      break
-  }
+  renderMerge(main)
 }
 
 window.addEventListener('hashchange', render)
