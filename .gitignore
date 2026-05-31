@@ -9,9 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
-public/wasm/
-public/dist/browser.worker.global.js
 dist-ssr
+public/wasm/
+public/dist/
 *.local
 
 # Editor directories and files

@@ -4,12 +4,12 @@ export function renderHome(container: HTMLElement): void {
       <a href="#/" class="site-logo">PDF <span>Tools</span></a>
     </header>
     <h1 class="page-title">Document utilities</h1>
-    <p class="page-subtitle">Convert Word files to PDF or merge multiple PDFs — privately in your browser.</p>
+    <p class="page-subtitle">Edit or combine PDFs privately in your browser — nothing is uploaded to a server.</p>
     <div class="action-grid">
-      <button type="button" class="glass-card action-card" data-route="convert">
-        <div class="action-icon" aria-hidden="true">W</div>
-        <h2>Word to PDF</h2>
-        <p>Upload one or more .doc / .docx files and download PDFs.</p>
+      <button type="button" class="glass-card action-card" data-route="edit">
+        <div class="action-icon" aria-hidden="true">✎</div>
+        <h2>Edit PDF</h2>
+        <p>Add text, images, pages, and whiteout regions, then download.</p>
       </button>
       <button type="button" class="glass-card action-card" data-route="merge">
         <div class="action-icon" aria-hidden="true">+</div>

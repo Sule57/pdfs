@@ -1,6 +1,6 @@
 import { mergePdfs, getPdfPageCount } from '../lib/merge-pdf'
 import { downloadBlob, formatBytes } from '../lib/download'
-import { validatePdfFile } from '../lib/converter'
+import { validatePdfFile } from '../lib/validate'
 
 interface MergeItem {
   id: string

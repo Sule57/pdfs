@@ -1,7 +1,7 @@
 import '../styles/main.css'
 import { renderHome } from './views/home'
-import { renderConvert } from './views/convert'
 import { renderMerge } from './views/merge'
+import { renderEdit } from './views/edit'
 
 const FOOTER =
   'Files are processed in your browser; nothing is uploaded to a server.'
@@ -17,8 +17,8 @@ function render(): void {
 
   const route = getRoute()
   document.title =
-    route === 'convert'
-      ? 'Word to PDF — PDF Tools'
+    route === 'edit'
+      ? 'Edit PDF — PDF Tools'
       : route === 'merge'
         ? 'Combine PDFs — PDF Tools'
         : 'PDF Tools — susic-security.com'
@@ -37,8 +37,8 @@ function render(): void {
   }
 
   switch (route) {
-    case 'convert':
-      renderConvert(main)
+    case 'edit':
+      renderEdit(main)
       break
     case 'merge':
       renderMerge(main)
