@@ -40,11 +40,25 @@ export interface ImageAnnotation {
 
 export type Annotation = TextAnnotation | WhiteoutAnnotation | ImageAnnotation
 
+/** Edit to text that was already in the PDF (whiteout + redraw on export). */
+export interface PdfTextEdit {
+  id: string
+  pageIndex: number
+  x: number
+  y: number
+  width: number
+  height: number
+  originalText: string
+  text: string
+  fontSize: number
+}
+
 export interface EditorState {
   sourceBytes: Uint8Array
   fileName: string
   pages: PageRef[]
   annotations: Annotation[]
+  textEdits: PdfTextEdit[]
 }
 
 export function createEditorState(
@@ -56,7 +70,7 @@ export function createEditorState(
   for (let i = 0; i < pageCount; i++) {
     pages.push({ type: 'original', sourceIndex: i })
   }
-  return { sourceBytes, fileName, pages, annotations: [] }
+  return { sourceBytes, fileName, pages, annotations: [], textEdits: [] }
 }
 
 export function newId(): string {

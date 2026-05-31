@@ -9,7 +9,7 @@ export function renderHome(container: HTMLElement): void {
       <button type="button" class="glass-card action-card" data-route="edit">
         <div class="action-icon" aria-hidden="true">✎</div>
         <h2>Edit PDF</h2>
-        <p>Add text, images, pages, and whiteout regions, then download.</p>
+        <p>Edit existing text, add overlays, reorder pages, then download.</p>
       </button>
       <button type="button" class="glass-card action-card" data-route="merge">
         <div class="action-icon" aria-hidden="true">+</div>

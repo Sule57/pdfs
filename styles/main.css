@@ -562,6 +562,43 @@ a:hover {
   height: auto;
 }
 
+.pdf-text-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.pdf-text-edit {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+  padding: 1px 2px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  color: #111;
+  font-family: Helvetica, Arial, sans-serif;
+  line-height: 1.15;
+  white-space: pre-wrap;
+  overflow: hidden;
+  outline: none;
+  cursor: text;
+}
+
+.pdf-text-edit:hover {
+  border-color: rgba(0, 180, 200, 0.45);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.pdf-text-edit.focused {
+  border-color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 2px rgba(0, 180, 200, 0.2);
+  z-index: 2;
+}
+
 .annotation-layer {
   position: absolute;
   left: 0;

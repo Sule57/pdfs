@@ -10,11 +10,16 @@ import {
 } from '../lib/editor/render-page'
 import { exportEditedPdf } from '../lib/editor/apply-edits'
 import {
+  extractPageTextSpans,
+  type PdfTextSpan,
+} from '../lib/editor/extract-text'
+import {
   createEditorState,
   newId,
   type EditorState,
   type ToolMode,
   type ImageAnnotation,
+  type PdfTextEdit,
 } from '../lib/editor/types'
 
 let state: EditorState | null = null
@@ -25,6 +30,7 @@ let selectedAnnotationId: string | null = null
 let pendingImageBytes: { bytes: Uint8Array; mime: 'image/png' | 'image/jpeg' } | null =
   null
 let whiteoutStart: { x: number; y: number } | null = null
+const spansByPage = new Map<number, PdfTextSpan[]>()
 
 export function renderEdit(container: HTMLElement): void {
   if (!state) {
@@ -41,8 +47,8 @@ function renderUpload(container: HTMLElement): void {
       <span class="site-logo">Edit <span>PDF</span></span>
     </header>
     <h1 class="page-title">Edit PDF</h1>
-    <p class="page-subtitle">Upload a PDF to add text, images, whiteout regions, and manage pages — all in your browser.</p>
-    <p class="editor-hint">Added content is layered on export. Scanned PDFs and complex layouts may need manual touch-up in a desktop editor.</p>
+    <p class="page-subtitle">Upload a PDF to edit existing text, add overlays, and manage pages — all in your browser.</p>
+    <p class="editor-hint">Text-based PDFs can be edited in Select mode. Scanned PDFs have no selectable text — use whiteout or a desktop OCR tool.</p>
     <div class="drop-zone" id="edit-drop" role="button" tabindex="0">
       <input type="file" id="edit-input" accept=".pdf,application/pdf" />
       <div class="drop-zone-icon" aria-hidden="true">↑</div>
@@ -76,6 +82,7 @@ function renderUpload(container: HTMLElement): void {
         return
       }
       clearPdfRenderCache()
+      clearSpansCache()
       state = createEditorState(bytes, file.name, count)
       activePageIndex = 0
       selectedAnnotationId = null
@@ -141,6 +148,7 @@ function renderEditor(container: HTMLElement): void {
       <div class="editor-main">
         <div class="canvas-wrap" id="canvas-wrap">
           <canvas id="page-canvas"></canvas>
+          <div id="pdf-text-layer" class="pdf-text-layer" hidden></div>
           <div id="annotation-layer" class="annotation-layer"></div>
         </div>
         <p class="editor-hint" id="tool-hint"></p>
@@ -151,6 +159,7 @@ function renderEditor(container: HTMLElement): void {
 
   container.querySelector('#edit-new')?.addEventListener('click', () => {
     clearPdfRenderCache()
+    clearSpansCache()
     state = null
     renderEdit(container)
   })
@@ -161,6 +170,7 @@ function renderEditor(container: HTMLElement): void {
       pendingImageBytes = null
       updateToolButtons(container)
       updateToolHint(container)
+      void drawPdfTextOverlays(container)
     })
   })
 
@@ -252,7 +262,8 @@ function updateToolButtons(container: HTMLElement): void {
 function updateToolHint(container: HTMLElement): void {
   const hint = container.querySelector('#tool-hint') as HTMLElement
   const hints: Record<ToolMode, string> = {
-    select: 'Click an added text or image to select. Drag selected images to move.',
+    select:
+      'Click existing text to edit it inline. Click added text or images to select; drag images to move.',
     text: 'Click on the page to place text.',
     image: pendingImageBytes
       ? 'Click on the page to place the image.'
@@ -262,6 +273,10 @@ function updateToolHint(container: HTMLElement): void {
   hint.textContent = hints[toolMode]
 }
 
+function clearSpansCache(): void {
+  spansByPage.clear()
+}
+
 function swapPages(a: number, b: number): void {
   if (!state) return
   ;[state.pages[a], state.pages[b]] = [state.pages[b], state.pages[a]]
@@ -269,6 +284,11 @@ function swapPages(a: number, b: number): void {
     if (ann.pageIndex === a) ann.pageIndex = b
     else if (ann.pageIndex === b) ann.pageIndex = a
   }
+  for (const edit of state.textEdits) {
+    if (edit.pageIndex === a) edit.pageIndex = b
+    else if (edit.pageIndex === b) edit.pageIndex = a
+  }
+  clearSpansCache()
 }
 
 function reindexAnnotationsAfterPageInsert(at: number): void {
@@ -276,20 +296,30 @@ function reindexAnnotationsAfterPageInsert(at: number): void {
   for (const ann of state.annotations) {
     if (ann.pageIndex >= at) ann.pageIndex++
   }
+  for (const edit of state.textEdits) {
+    if (edit.pageIndex >= at) edit.pageIndex++
+  }
+  clearSpansCache()
 }
 
 function reindexAnnotationsAfterPageDelete(at: number): void {
   if (!state) return
   state.annotations = state.annotations.filter((ann) => ann.pageIndex !== at)
+  state.textEdits = state.textEdits.filter((edit) => edit.pageIndex !== at)
   for (const ann of state.annotations) {
     if (ann.pageIndex > at) ann.pageIndex--
   }
+  for (const edit of state.textEdits) {
+    if (edit.pageIndex > at) edit.pageIndex--
+  }
+  clearSpansCache()
 }
 
 async function refreshEditor(container: HTMLElement): Promise<void> {
   if (!state) return
   await refreshThumbnails(container)
   await refreshMainCanvas(container)
+  await drawPdfTextOverlays(container)
   drawAnnotationOverlays(container)
 }
 
@@ -331,6 +361,104 @@ async function refreshMainCanvas(container: HTMLElement): Promise<void> {
     canvas,
     1.35,
   )
+}
+
+function getSpanDisplayText(span: PdfTextSpan): string {
+  if (!state) return span.text
+  const edit = state.textEdits.find((e) => e.id === span.id)
+  return edit?.text ?? span.text
+}
+
+function upsertTextEdit(span: PdfTextSpan, newText: string): void {
+  if (!state) return
+  const trimmed = newText.trim()
+  if (trimmed === span.text) {
+    state.textEdits = state.textEdits.filter((e) => e.id !== span.id)
+    return
+  }
+  const existing = state.textEdits.find((e) => e.id === span.id)
+  const record: PdfTextEdit = {
+    id: span.id,
+    pageIndex: activePageIndex,
+    x: span.x,
+    y: span.y,
+    width: span.width,
+    height: span.height,
+    originalText: span.text,
+    text: trimmed,
+    fontSize: span.fontSize,
+  }
+  if (existing) {
+    Object.assign(existing, record)
+  } else {
+    state.textEdits.push(record)
+  }
+}
+
+async function ensurePageSpans(): Promise<PdfTextSpan[]> {
+  if (!state) return []
+  if (!spansByPage.has(activePageIndex)) {
+    const spans = await extractPageTextSpans(
+      state.sourceBytes,
+      state.pages[activePageIndex],
+    )
+    spansByPage.set(activePageIndex, spans)
+  }
+  return spansByPage.get(activePageIndex) ?? []
+}
+
+async function drawPdfTextOverlays(container: HTMLElement): Promise<void> {
+  if (!state || !renderMeta) return
+  const layer = container.querySelector('#pdf-text-layer') as HTMLElement
+  const { width, height, pdfWidth, pdfHeight } = renderMeta
+  layer.style.width = `${width}px`
+  layer.style.height = `${height}px`
+  layer.innerHTML = ''
+
+  const showLayer = toolMode === 'select' && state.pages[activePageIndex].type === 'original'
+  layer.hidden = !showLayer
+  if (!showLayer) return
+
+  const spans = await ensurePageSpans()
+  if (spans.length === 0) return
+
+  for (const span of spans) {
+    const left = (span.x / pdfWidth) * width
+    const top = height - ((span.y + span.height) / pdfHeight) * height
+    const w = (span.width / pdfWidth) * width
+    const h = (span.height / pdfHeight) * height
+    const fontPx = (span.fontSize / pdfHeight) * height
+
+    const el = document.createElement('div')
+    el.className = 'pdf-text-edit'
+    el.contentEditable = 'true'
+    el.spellcheck = false
+    el.style.left = `${left}px`
+    el.style.top = `${top}px`
+    el.style.width = `${Math.max(w, 24)}px`
+    el.style.minHeight = `${Math.max(h, fontPx * 1.2)}px`
+    el.style.fontSize = `${fontPx}px`
+    el.textContent = getSpanDisplayText(span)
+
+    el.addEventListener('mousedown', (e) => e.stopPropagation())
+    el.addEventListener('click', (e) => e.stopPropagation())
+    el.addEventListener('focus', () => {
+      el.classList.add('focused')
+      selectedAnnotationId = null
+    })
+    el.addEventListener('blur', () => {
+      el.classList.remove('focused')
+      upsertTextEdit(span, el.textContent ?? '')
+    })
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        el.blur()
+      }
+    })
+
+    layer.appendChild(el)
+  }
 }
 
 function drawAnnotationOverlays(container: HTMLElement): void {

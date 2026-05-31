@@ -9,7 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 let pdfDocCache: { bytes: Uint8Array; doc: pdfjsLib.PDFDocumentProxy } | null =
   null
 
-async function getPdfDocument(
+export async function getPdfDocument(
   bytes: Uint8Array,
 ): Promise<pdfjsLib.PDFDocumentProxy> {
   if (pdfDocCache && pdfDocCache.bytes === bytes) {

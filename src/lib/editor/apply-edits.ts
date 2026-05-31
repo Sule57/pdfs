@@ -4,7 +4,7 @@ import {
   rgb,
   type PDFPage,
 } from 'pdf-lib'
-import type { Annotation, EditorState, ImageAnnotation } from './types'
+import type { Annotation, EditorState, ImageAnnotation, PdfTextEdit } from './types'
 
 const A4: [number, number] = [595.28, 841.89]
 
@@ -18,6 +18,34 @@ async function embedImage(
   }
   const img = await doc.embedJpg(ann.bytes)
   return { img, scale: 1 }
+}
+
+function applyTextEdits(
+  page: PDFPage,
+  textEdits: PdfTextEdit[],
+  pageIndex: number,
+  font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+): void {
+  for (const edit of textEdits) {
+    if (edit.pageIndex !== pageIndex) continue
+    if (edit.text === edit.originalText) continue
+
+    page.drawRectangle({
+      x: edit.x,
+      y: edit.y,
+      width: edit.width,
+      height: edit.height,
+      color: rgb(1, 1, 1),
+      borderWidth: 0,
+    })
+    page.drawText(edit.text, {
+      x: edit.x + 2,
+      y: edit.y + edit.height * 0.72,
+      size: edit.fontSize,
+      font,
+      color: rgb(0, 0, 0),
+    })
+  }
 }
 
 function applyAnnotations(
@@ -79,6 +107,7 @@ export async function exportEditedPdf(state: EditorState): Promise<Uint8Array> {
       page = out.getPage(out.getPageCount() - 1)
     }
 
+    applyTextEdits(page, state.textEdits, displayIndex, font)
     applyAnnotations(page, state.annotations, displayIndex, font)
 
     for (const ann of state.annotations) {
