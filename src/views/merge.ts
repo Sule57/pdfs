@@ -21,7 +21,8 @@ export function renderMerge(container: HTMLElement): void {
 
   container.innerHTML = `
     <header class="site-header">
-      <span class="site-logo">PDF <span>Tools</span></span>
+      <a href="#/" class="back-link">← Back</a>
+      <span class="site-logo">Combine <span>PDFs</span></span>
     </header>
     <h1 class="page-title">Combine PDFs</h1>
     <p class="page-subtitle">Upload PDFs, drag to reorder, then download the merged document.</p>
