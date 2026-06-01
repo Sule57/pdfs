@@ -444,11 +444,65 @@ a:hover {
   line-height: 1.5;
 }
 
-.md-toolbar {
+.md-editor-card {
+  background: var(--bg-glass);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.md-card-header {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.md-tabs {
+  display: inline-flex;
+  gap: 0;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.md-tab {
+  padding: 0.4rem 1rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.md-tab:hover {
+  color: var(--text-primary);
+}
+
+.md-tab.active {
+  color: var(--accent-cyan);
+  background: rgba(3, 169, 244, 0.15);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.md-tab:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.md-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .md-upload-btn {
@@ -456,64 +510,47 @@ a:hover {
   margin: 0;
 }
 
-.md-workspace {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  align-items: stretch;
+.md-card-body {
+  position: relative;
+  min-height: 50vh;
 }
 
-@media (max-width: 900px) {
-  .md-workspace {
-    grid-template-columns: 1fr;
-  }
+.md-pane-edit,
+.md-pane-preview {
+  min-height: 50vh;
 }
 
-.md-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-
-.md-pane-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  margin-bottom: 0.5rem;
+.md-pane-hidden {
+  display: none !important;
 }
 
 .md-editor {
-  flex: 1;
-  min-height: 50vh;
+  display: block;
   width: 100%;
+  min-height: 50vh;
+  height: 100%;
   padding: 1rem;
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
   font-size: 0.875rem;
   line-height: 1.55;
   color: var(--text-primary);
-  background: var(--bg-glass);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   resize: vertical;
   box-sizing: border-box;
 }
 
 .md-editor:focus {
   outline: none;
-  border-color: var(--primary-500);
 }
 
 .md-preview-pane {
-  flex: 1;
   min-height: 50vh;
   overflow: auto;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
   background: #2a2a2a;
   padding: 1rem;
+  box-sizing: border-box;
 }
 
 .md-preview {
